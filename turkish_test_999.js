@@ -4,16 +4,31 @@
     if (!window.Lampa) return;
 
     function start() {
-        Lampa.Noty.show('🔥 TURKISH 999 LOADED', { time: 5000 });
+        Lampa.Noty.show('🔥 TURKISH 999 LOADED', { time: 4000 });
 
         Lampa.Listener.follow('full', function (e) {
-            Lampa.Noty.show('full: ' + e.type, { time: 4000 });
-        });
+            if (e.type !== 'complite') return;
 
-        Lampa.Listener.follow('activity', function (e) {
-            if (e.component === 'full') {
-                Lampa.Noty.show('activity/full: ' + e.type, { time: 4000 });
+            var movie = e.data && e.data.movie;
+
+            if (!movie) {
+                Lampa.Noty.show('❌ COMPLITE BUT NO MOVIE', { time: 6000 });
+                return;
             }
+
+            var title = movie.title || movie.name || 'N/A';
+            var original = movie.original_title || movie.original_name || 'N/A';
+            var imdb = movie.imdb_id || 'N/A';
+            var kp = movie.kinopoisk_id || 'N/A';
+
+            Lampa.Noty.show(
+                '🎬 MOVIE FOUND\n' +
+                title + '\n' +
+                'Original: ' + original + '\n' +
+                'IMDb: ' + imdb + '\n' +
+                'KP: ' + kp,
+                { time: 10000 }
+            );
         });
     }
 
