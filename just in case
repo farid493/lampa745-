@@ -1,0 +1,64 @@
+(function () {
+    'use strict';
+
+    if (!window.Lampa) return;
+
+    // Безопасная асинхронная вставка кнопки
+    function injectButton(render, movie) {
+        var container = render.find('.full-start__buttons');
+        if (!container.length) container = render.find('.full-start-new__buttons');
+        if (!container.length) container = render.find('.view--torrent').parent();
+
+        if (!container.length) return;
+        if (container.find('.tr-turkish-button').length) return;
+
+        var button = $(
+            '<div class="full-start__button selector tr-turkish-button" style="background: #e50914; color: #fff; margin-left: 8px;">' +
+                '<span style="margin-right:8px;">🇹🇷</span>' +
+                '<span>TURKISH</span>' +
+            '</div>'
+        );
+
+        // Обработчик клика по кнопке
+        button.on('hover:enter', function () {
+            var title = movie.title || movie.name || 'N/A';
+            var originalTitle = movie.original_title || movie.original_name || title;
+
+            // TODO: Здесь будет запускаться функция поиска турецкого источника
+            Lampa.Noty.show('🇹🇷 Поиск турецких источников: ' + title + ' (' + originalTitle + ')');
+        });
+
+        container.append(button);
+    }
+
+    function start() {
+        // Подписываемся на стандартный жизненный цикл карточки Lampa
+        Lampa.Listener.follow('full', function (e) {
+            if (e.type !== 'complite') return;
+
+            var movie = e.data && e.data.movie;
+            if (!movie) return;
+
+            var render = e.object && e.object.activity && e.object.activity.render
+                ? e.object.activity.render()
+                : null;
+
+            if (render) {
+                injectButton(render, movie);
+            }
+        });
+    }
+
+    // Безопасная инициализация после готовности приложения
+    if (window.appready) {
+        start();
+    } else {
+        if (Lampa.Listener && Lampa.Listener.follow) {
+            Lampa.Listener.follow('app', function (e) {
+                if (e.type === 'ready') start();
+            });
+        } else {
+            start();
+        }
+    }
+})();
