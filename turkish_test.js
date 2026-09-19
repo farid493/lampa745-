@@ -1,49 +1,23 @@
 (function () {
     'use strict';
 
-    function startPlugin() {
-        if (window.turkish_test_started) return;
-        window.turkish_test_started = true;
+    window.turkish_raw_test = 'LOADED';
 
-        Lampa.Noty.show('🇹🇷 TURKISH PLUGIN LOADED', {
-            time: 10000
-        });
+    setTimeout(function () {
+        var box = document.createElement('div');
 
-        Lampa.Listener.follow('full', function (e) {
-            if (e.type !== 'complite') return;
+        box.style.position = 'fixed';
+        box.style.left = '20px';
+        box.style.top = '20px';
+        box.style.zIndex = '999999';
+        box.style.padding = '20px';
+        box.style.background = '#00aa66';
+        box.style.color = '#ffffff';
+        box.style.fontSize = '24px';
+        box.style.fontWeight = 'bold';
 
-            Lampa.Noty.show('FULL EVENT WORKS', {
-                time: 5000
-            });
-        });
-    }
+        box.textContent = '🇹🇷 TURKISH JS EXECUTED';
 
-    function bootstrap() {
-        if (typeof Lampa === 'undefined') {
-            setTimeout(bootstrap, 300);
-            return;
-        }
-
-        if (window.appready) {
-            startPlugin();
-            return;
-        }
-
-        if (Lampa.Listener && Lampa.Listener.follow) {
-            Lampa.Listener.follow('app', function (e) {
-                if (e.type === 'ready') {
-                    startPlugin();
-                }
-            });
-        }
-
-        setTimeout(function () {
-            if (window.appready) {
-                startPlugin();
-            }
-        }, 1500);
-    }
-
-    bootstrap();
-
+        document.body.appendChild(box);
+    }, 1000);
 })();
