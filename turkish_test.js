@@ -1,7 +1,30 @@
 (function () {
     'use strict';
 
-    if (typeof Lampa === 'undefined') return;
+    if (!window.Lampa) return;
 
-    Lampa.Noty.show('🔥 VERSION 999 — NEW CODE', { time: 10000 });
+    function start() {
+        Lampa.Noty.show('🔥 TURKISH 999 LOADED', { time: 5000 });
+
+        Lampa.Listener.follow('full', function (e) {
+            Lampa.Noty.show('full: ' + e.type, { time: 4000 });
+        });
+
+        Lampa.Listener.follow('activity', function (e) {
+            if (e.component !== 'full') return;
+            Lampa.Noty.show('activity/full: ' + e.type, { time: 4000 });
+        });
+    }
+
+    if (window.appready) {
+        start();
+    } else {
+        if (Lampa.Listener && Lampa.Listener.follow) {
+            Lampa.Listener.follow('app', function (e) {
+                if (e.type === 'ready') start();
+            });
+        } else {
+            start();
+        }
+    }
 })();
