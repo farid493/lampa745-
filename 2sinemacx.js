@@ -5,42 +5,59 @@
 
     var BASE_URL = 'https://www.sinema.gg';
 
-    function parseSearchHtml(html, searchYear) {
+    // Вспомогательная функция очистки строк (из Nuvio)
+    function cleanString(str) {
+        return (str || '').toLowerCase().replace(/[^a-z0-9\s]/gi, '').trim();
+    }
+
+    // Аналог cheerio-парсинга из Nuvio через браузерный DOMParser
+    function parseSearchHtml(html, searchYear, queryText) {
         var parser = new DOMParser();
         var doc = parser.parseFromString(html, 'text/html');
+        
+        // Ищем в основном контейнере выдачи
         var mainContainer = doc.querySelector('#content, .content, .site-main, #main, .posts-container') || doc;
         var links = mainContainer.querySelectorAll('a.baslik, a.resim, article a, .post-title a, h2 a, h3 a');
-
+        
         var fallbackLink = '';
+        var targetClean = cleanString(queryText);
 
         for (var i = 0; i < links.length; i++) {
             var href = links[i].getAttribute('href') || '';
-            var titleText = (links[i].textContent || '').toLowerCase();
+            var titleText = links[i].textContent || '';
+            var cleanTitle = cleanString(titleText);
+            
             if (!href) continue;
 
             if (href.indexOf('http') !== 0) {
                 href = BASE_URL + (href.indexOf('/') === 0 ? '' : '/') + href;
             }
 
-            if (href.indexOf('/category/') === -1 &&
-                href.indexOf('/tag/') === -1 &&
-                href.indexOf('/page/') === -1 &&
+            // Фильтрация системных страниц
+            if (href.indexOf('/category/') === -1 && 
+                href.indexOf('/tag/') === -1 && 
+                href.indexOf('/page/') === -1 && 
                 href.indexOf('/search/') === -1 &&
                 href !== BASE_URL + '/') {
 
                 if (!fallbackLink) fallbackLink = href;
 
+                // Точное совпадение по году и названию (как в Nuvio)
                 if (searchYear && (titleText.indexOf(searchYear) !== -1 || href.indexOf(searchYear) !== -1)) {
-                    return href;
+                    if (!targetClean || cleanTitle.indexOf(targetClean) !== -1) {
+                        return href;
+                    }
                 }
             }
         }
         return fallbackLink;
     }
 
+    // Внедрение кнопки (из твоего рабочего скрипта)
     function injectButton(render, movie) {
         var container = render.find('.full-start__buttons');
         if (!container.length) container = render.find('.full-start-new__buttons');
+        if (!container.length) container = render.find('.buttons');
         if (!container.length) container = render.find('.view--torrent').parent();
 
         if (!container.length) return;
@@ -76,32 +93,34 @@
 
             var query1 = origTitle || localTitle;
 
-            // 1. Поиск на sinema.gg
+            // 1. Поиск на sinema.gg (Логика Nuvio Provider)
             fetch(BASE_URL + '/?s=' + encodeURIComponent(query1))
                 .then(function (res) {
-                    if (!res.ok) throw new Error('sinema.gg статус: ' + res.status);
+                    if (!res.ok) throw new Error('CORS / Ошибка доступа sinema.gg: ' + res.status);
                     return res.text();
                 })
                 .then(function (html) {
-                    var targetUrl = parseSearchHtml(html, cardYear);
+                    var targetUrl = parseSearchHtml(html, cardYear, query1);
 
+                    // Если по оригинальному названию не нашли, пробуем локальное
                     if (!targetUrl && origTitle && localTitle && origTitle !== localTitle) {
                         return fetch(BASE_URL + '/?s=' + encodeURIComponent(localTitle))
                             .then(function (res2) { return res2.text(); })
                             .then(function (html2) {
-                                return parseSearchHtml(html2, cardYear);
+                                return parseSearchHtml(html2, cardYear, localTitle);
                             });
                     }
                     return targetUrl;
                 })
                 .then(function (targetUrl) {
-                    if (!targetUrl) throw new Error('Фильм не найден в поиске');
+                    if (!targetUrl) throw new Error('Фильм не найден на SinemaCX');
 
-                    Lampa.Noty.show('Загрузка плеера...');
+                    Lampa.Noty.show('Анализ плеера...');
                     return fetch(targetUrl);
                 })
                 .then(function (res) { return res.text(); })
                 .then(function (pageHtml) {
+                    // 2. Извлечение iframe filmizle.in
                     var iframeMatch = pageHtml.match(/(src|data-vsrc)="([^"]*filmizle\.in[^"]*)"/i);
                     if (!iframeMatch || !iframeMatch[2]) throw new Error('Плеер filmizle.in не найден');
 
@@ -116,6 +135,7 @@
 
                     if (!videoId) throw new Error('Не удалось извлечь ID видео');
 
+                    Lampa.Noty.show('Получение HLS потока...');
                     var apiUrl = 'https://player.filmizle.in/player/index.php?data=' + videoId + '&do=getVideo';
                     var postData = 'hash=' + encodeURIComponent(videoId) + '&r=' + encodeURIComponent(BASE_URL + '/');
 
@@ -134,11 +154,11 @@
                     try {
                         jsonResult = JSON.parse(responseText);
                     } catch (err) {
-                        throw new Error('Балансер вернул не JSON');
+                        throw new Error('Балансер отдал невалидный ответ');
                     }
 
                     if (jsonResult && jsonResult.securedLink) {
-                        Lampa.Noty.show('Запуск видео...');
+                        Lampa.Noty.show('Запуск воспроизведения...');
 
                         var videoData = {
                             url: jsonResult.securedLink,
@@ -148,7 +168,7 @@
 
                         Lampa.Player.play(videoData);
                     } else {
-                        throw new Error('Поток не найден');
+                        throw new Error('Поток заблокирован или отсутствует');
                     }
                     resetProcessing();
                 })
@@ -165,12 +185,12 @@
     }
 
     function start() {
-        Lampa.Noty.show('🇹🇷 SinemaCX Плагин Загружен', { time: 3000 });
+        Lampa.Noty.show('🇹🇷 SinemaCX Nuvio Adapter Загружен', { time: 3000 });
 
         Lampa.Listener.follow('full', function (e) {
             if (e.type !== 'complite') return;
 
-            var movie = e.data && e.data.movie;
+            var movie = e.data && (e.data.movie || e.data.card);
             if (!movie) return;
 
             var render = e.object && e.object.activity && e.object.activity.render
